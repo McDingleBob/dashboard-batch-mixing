@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Batch Mixing</title>
+<style>
+:root {
+  --bg: #f4f5f7; --panel: #ffffff; --ink: #1b1f24; --muted: #66707c; --line: #e2e5ea;
+  --accent: #2563eb; --ok: #15803d; --warn: #b45309; --bad: #b91c1c; --info: #0369a1;
+  --ok-bg: #dcfce7; --warn-bg: #fef3c7; --bad-bg: #fee2e2; --info-bg: #e0f2fe; --idle-bg: #eef0f3;
+  --water: #3b82f6; --water-2: #93c5fd;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1216; --panel: #171b21; --ink: #e8ebef; --muted: #9aa3ad; --line: #2a3038;
+    --accent: #60a5fa; --ok: #4ade80; --warn: #fbbf24; --bad: #f87171; --info: #38bdf8;
+    --ok-bg: #14321f; --warn-bg: #3a2a0c; --bad-bg: #3b1515; --info-bg: #0c2a3a; --idle-bg: #232930;
+    --water: #3b82f6; --water-2: #1e3a8a;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1216; --panel: #171b21; --ink: #e8ebef; --muted: #9aa3ad; --line: #2a3038;
+  --accent: #60a5fa; --ok: #4ade80; --warn: #fbbf24; --bad: #f87171; --info: #38bdf8;
+  --ok-bg: #14321f; --warn-bg: #3a2a0c; --bad-bg: #3b1515; --info-bg: #0c2a3a; --idle-bg: #232930;
+  --water: #3b82f6; --water-2: #1e3a8a;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
+h1 { font-size: 18px; margin: 0; }
+h1 small { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 12px; }
+main { max-width: 1200px; margin: 0 auto; padding: 16px; display: grid; gap: 16px;
+  grid-template-columns: repeat(12, 1fr); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; min-width: 0; }
+.span-12 { grid-column: span 12; } .span-8 { grid-column: span 8; } .span-6 { grid-column: span 6; }
+.span-4 { grid-column: span 4; } .span-3 { grid-column: span 3; }
+@media (max-width: 900px) { .span-8, .span-6, .span-4, .span-3 { grid-column: span 12; } }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+  font-size: 13px; font-weight: 600; background: var(--idle-bg); color: var(--muted); white-space: nowrap; }
+.pill .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.pill.ok { background: var(--ok-bg); color: var(--ok); } .pill.bad { background: var(--bad-bg); color: var(--bad); }
+.pill.warn { background: var(--warn-bg); color: var(--warn); } .pill.info { background: var(--info-bg); color: var(--info); }
+.status-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.banner { grid-column: span 12; padding: 10px 14px; border-radius: 10px; font-weight: 600; display: none; }
+.banner.show { display: block; } .banner.bad { background: var(--bad-bg); color: var(--bad); }
+.banner.warn { background: var(--warn-bg); color: var(--warn); }
+.flow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.flow .st { padding: 8px 12px; border-radius: 8px; background: var(--idle-bg); color: var(--muted);
+  font-weight: 600; font-size: 13px; }
+.flow .arrow { color: var(--muted); }
+.flow .st.active { background: var(--accent); color: #fff; }
+.flow .st.fault.active { background: var(--bad); }
+.big { font-size: 34px; font-weight: 700; line-height: 1.1; }
+.sub { color: var(--muted); font-size: 13px; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 14px; }
+.kv dt { color: var(--muted); } .kv dd { margin: 0; font-weight: 600; }
+.tank-wrap { display: flex; gap: 16px; align-items: stretch; }
+.tank { position: relative; width: 90px; height: 200px; border: 2px solid var(--line); border-radius: 10px;
+  overflow: hidden; background: var(--bg); flex: none; }
+.tank .fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0;
+  background: linear-gradient(var(--water-2), var(--water)); transition: height .4s; }
+.tank .mark { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--muted); font-size: 9px;
+  line-height: 1; color: var(--muted); padding: 1px 0 0 4px; }
+.act-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+@media (max-width: 500px) { .act-grid { grid-template-columns: repeat(2, 1fr); } }
+.act { border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: flex; align-items: center; gap: 10px; }
+.lamp { width: 14px; height: 14px; border-radius: 50%; background: var(--idle-bg); border: 1px solid var(--line); flex: none; }
+.act.on .lamp { background: var(--ok); box-shadow: 0 0 0 4px var(--ok-bg); }
+.act .name { font-weight: 600; font-size: 14px; } .act .rep { font-size: 11px; color: var(--muted); }
+button { font: inherit; font-weight: 600; border-radius: 8px; border: 1px solid var(--line); background: var(--panel);
+  color: var(--ink); padding: 9px 14px; cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.danger { background: var(--bad); border-color: var(--bad); color: #fff; }
+button.seg { border-radius: 0; } button.seg:first-child { border-radius: 8px 0 0 8px; }
+button.seg:last-child { border-radius: 0 8px 8px 0; margin-left: -1px; }
+button.seg.sel { background: var(--accent); color: #fff; border-color: var(--accent); }
+.estop { width: 100%; padding: 16px; font-size: 16px; letter-spacing: .04em; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+input[type=number], input[type=text], input[type=password] { font: inherit; padding: 8px 10px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink); width: 100%; }
+input[type=number] { width: 90px; }
+label.f { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.toggle { display: flex; justify-content: space-between; align-items: center; padding: 8px 0;
+  border-bottom: 1px solid var(--line); font-size: 14px; }
+.toggle:last-child { border-bottom: 0; }
+.switch { position: relative; width: 44px; height: 24px; flex: none; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch span { position: absolute; inset: 0; background: var(--idle-bg); border: 1px solid var(--line);
+  border-radius: 999px; transition: .2s; cursor: pointer; }
+.switch span::before { content: ""; position: absolute; width: 18px; height: 18px; left: 2px; top: 2px;
+  background: var(--panel); border-radius: 50%; transition: .2s; box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+.switch input:checked + span { background: var(--accent); border-color: var(--accent); }
+.switch input:checked + span::before { transform: translateX(20px); }
+.switch input:disabled + span { opacity: .45; cursor: not-allowed; }
+.hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.chart { width: 100%; height: auto; display: block; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .axis { fill: var(--muted); font-size: 10px; }
+.chart .ln { fill: none; stroke-width: 2; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+td.t { white-space: nowrap; color: var(--muted); font-variant-numeric: tabular-nums; }
+.log-wrap { max-height: 360px; overflow: auto; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;
+  background: var(--idle-bg); color: var(--muted); white-space: nowrap; }
+.tag.bad { background: var(--bad-bg); color: var(--bad); } .tag.warn { background: var(--warn-bg); color: var(--warn); }
+.tag.ok { background: var(--ok-bg); color: var(--ok); } .tag.info { background: var(--info-bg); color: var(--info); }
+ul.il { margin: 0; padding-left: 18px; font-size: 14px; } ul.il li { color: var(--warn); }
+details summary { cursor: pointer; font-weight: 600; }
+.toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: var(--bg);
+  padding: 10px 16px; border-radius: 10px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw; }
+.toast.show { opacity: 1; }
+footer { text-align: center; color: var(--muted); font-size: 12px; padding: 8px 16px 24px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Dashboard Batch Mixing
+    <small>UTS ITO 2026 · Topik 7 · ESP32 (Wokwi) + Firebase Realtime Database</small></h1>
+  <div class="status-row">
+    <span class="pill" id="connPill"><span class="dot"></span><span id="connText">Menghubungkan…</span></span>
+    <span class="pill" id="espPill"><span class="dot"></span><span id="espText">ESP32: menunggu data</span></span>
+  </div>
+</header>
+
+<main>
+  <div class="banner bad" id="faultBanner"></div>
+  <div class="banner warn" id="staleBanner"></div>
+
+  <section class="card span-12">
+    <h2>Urutan proses (state machine)</h2>
+    <div class="flow" id="flow"></div>
+  </section>
+
+  <section class="card span-4">
+    <h2>Status</h2>
+    <div class="big" id="stateBig">–</div>
+    <div class="sub" id="stateSub">&nbsp;</div>
+    <dl class="kv" style="margin-top:14px">
+      <dt>Mode</dt><dd id="kvMode">–</dd>
+      <dt>Batch ke-</dt><dd id="kvBatch">–</dd>
+      <dt>Alasan fault</dt><dd id="kvFault">–</dd>
+      <dt>E-Stop</dt><dd id="kvEstop">–</dd>
+      <dt>Uptime ESP32</dt><dd id="kvUptime">–</dd>
+      <dt>Update terakhir</dt><dd id="kvAge">–</dd>
+    </dl>
+  </section>
+
+  <section class="card span-4">
+    <h2>Level tangki</h2>
+    <div class="tank-wrap">
+      <div class="tank" id="tank">
+        <div class="fill" id="tankFill"></div>
+        <div class="mark" style="bottom:95%">95</div>
+        <div class="mark" id="markTarget" style="bottom:80%">80</div>
+        <div class="mark" style="bottom:20%">20</div>
+        <div class="mark" style="bottom:10%">10</div>
+      </div>
+      <div>
+        <div class="big" id="levelBig">–</div>
+        <div class="sub">Input simulasi: potensiometer</div>
+        <dl class="kv" style="margin-top:12px">
+          <dt>Target isi</dt><dd id="kvFill">–</dd>
+          <dt>Mulai jika</dt><dd>&lt; 10 %</dd>
+          <dt>Kuras selesai</dt><dd>≤ 5 %</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <section class="card span-4">
+    <h2>Suhu proses</h2>
+    <div class="big" id="tempBig">–</div>
+    <div class="sub">Input simulasi: slider DHT22</div>
+    <dl class="kv" style="margin-top:12px">
+      <dt>Setpoint</dt><dd id="kvSp">–</dd>
+      <dt>Hysteresis heater</dt><dd id="kvBand">–</dd>
+      <dt>Sensor</dt><dd id="kvValid">–</dd>
+      <dt>Overheat</dt><dd>≥ 70 °C → FAULT</dd>
+    </dl>
+  </section>
+
+  <section class="card span-6">
+    <h2>Aktuator (status aktual dari ESP32)</h2>
+    <div class="act-grid" id="acts"></div>
+    <h2 style="margin-top:16px">Interlock aktif</h2>
+    <div id="interlocks" class="sub">Tidak ada</div>
+  </section>
+
+  <section class="card span-6">
+    <h2>Kontrol</h2>
+    <div class="row">
+      <span class="sub" style="min-width:60px">Mode</span>
+      <div><button class="seg" id="btnAuto">AUTO</button><button class="seg" id="btnManual">MANUAL</button></div>
+    </div>
+    <div class="row">
+      <button class="primary" id="btnStart">▶ START batch</button>
+      <button id="btnReset">↺ RESET fault</button>
+    </div>
+    <button class="danger estop" id="btnEstop">EMERGENCY STOP</button>
+    <div class="hint">Perintah ditulis ke <code>controls</code>; ESP32 tetap menolak perintah yang melanggar interlock atau urutan proses. MANUAL hanya diterima saat IDLE/FAULT.</div>
+
+    <div class="row" style="margin-top:16px">
+      <div><label class="f" for="inSp">Setpoint suhu (30–65 °C)</label>
+        <input type="number" id="inSp" min="30" max="65" step="1"></div>
+      <div><label class="f" for="inFill">Target isi (50–90 %)</label>
+        <input type="number" id="inFill" min="50" max="90" step="1"></div>
+      <div style="align-self:flex-end"><button id="btnParams">Kirim parameter</button></div>
+    </div>
+
+    <details id="manualBox">
+      <summary>Perintah manual (mode MANUAL)</summary>
+      <div id="manualList" style="margin-top:8px"></div>
+      <div class="hint" id="manualHint"></div>
+    </details>
+  </section>
+
+  <section class="card span-6">
+    <h2>Riwayat level (%)</h2>
+    <svg class="chart" id="chartLevel" viewBox="0 0 400 150" role="img" aria-label="Grafik level tangki"></svg>
+  </section>
+  <section class="card span-6">
+    <h2>Riwayat suhu (°C)</h2>
+    <svg class="chart" id="chartTemp" viewBox="0 0 400 150" role="img" aria-label="Grafik suhu proses"></svg>
+  </section>
+
+  <section class="card span-12">
+    <h2>Event log (50 terakhir)</h2>
+    <div class="log-wrap">
+      <table>
+        <thead><tr><th>Waktu (WIB)</th><th>Event</th><th>Detail</th></tr></thead>
+        <tbody id="logBody"><tr><td colspan="3" class="sub">Belum ada event.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card span-12">
+    <details>
+      <summary>Pengaturan koneksi Firebase</summary>
+      <div style="margin-top:12px; display:grid; gap:10px; max-width:640px">
+        <div><label class="f" for="inDb">Database URL</label><input type="text" id="inDb"></div>
+        <div><label class="f" for="inKey">Web API Key (opsional, untuk login anonim bila Security Rules memakai auth)</label>
+          <input type="password" id="inKey" autocomplete="off"></div>
+        <div><button class="primary" id="btnSave">Simpan &amp; sambungkan ulang</button></div>
+        <div class="hint">Disimpan hanya di browser ini. API key Firebase bukan rahasia, tetapi tetap jangan ditampilkan di video.</div>
+      </div>
+    </details>
+  </section>
+</main>
+<footer>Data dibaca realtime lewat Firebase REST streaming (Server-Sent Events). Grafik hanya menampilkan data sejak halaman dibuka.</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+"use strict";
+const DEFAULT_DB = "https://uts-iot-2590c-default-rtdb.asia-southeast1.firebasedatabase.app";
+const ROOT = "/batch_system";
+const STATES = ["IDLE", "FILLING", "MIXING", "HOLDING", "DRAINING", "COMPLETE", "FAULT"];
+const STATE_DESC = {
+  IDLE: "Menunggu START (tangki harus < 10 %)", FILLING: "Katup inlet + pompa menyala",
+  MIXING: "Mixer + heater menuju setpoint", HOLDING: "Menahan suhu selama 10 detik",
+  DRAINING: "Katup outlet terbuka", COMPLETE: "Batch selesai, buzzer berbunyi",
+  FAULT: "Semua aktuator mati, perlu RESET"
+};
+const ACTUATORS = [
+  ["inlet_valve", "Katup inlet", "Servo"], ["outlet_valve", "Katup outlet", "Servo"],
+  ["pump", "Pompa", "LED biru"], ["mixer", "Mixer", "LED kuning"],
+  ["heater", "Heater", "LED merah"], ["buzzer", "Buzzer", "Alarm"]
+];
+const MANUALS = [
+  ["manual_inlet", "Katup inlet"], ["manual_outlet", "Katup outlet"], ["manual_pump", "Pompa"],
+  ["manual_mixer", "Mixer"], ["manual_heater", "Heater"]
+];
+const INTERLOCKS = [
+  "I1 Inlet & outlet dilarang buka bersamaan",
+  "I2 Mixer/heater dilarang saat level < 20 %",
+  "I3 Heater dilarang tanpa mixer",
+  "I4 Inlet/pompa dilarang saat level ≥ 95 % (overflow)",
+  "I5 Pompa dilarang saat katup inlet tertutup"
+];
+const STALE_MS = 15000;
+const HIST_MAX = 300;
+
+const $ = (id) => document.getElementById(id);
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+};
+const cfg = { db: store.get("dash_db") || DEFAULT_DB, apiKey: store.get("dash_key") || "" };
+
+let auth = { idToken: null, refreshToken: null, exp: 0 };
+let tel = null, ctl = {}, log = {};
+let lastTs = 0;
+const hist = [];
+const streams = {};
+
+// ---------- Auth (opsional, login anonim Firebase) ----------
+async function ensureAuth(force) {
+  if (!cfg.apiKey) return null;
+  if (!force && auth.idToken && Date.now() < auth.exp) return auth.idToken;
+  if (auth.refreshToken) {
+    const r = await fetch("https://securetoken.googleapis.com/v1/token?key=" + encodeURIComponent(cfg.apiKey), {
+      method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "grant_type=refresh_token&refresh_token=" + encodeURIComponent(auth.refreshToken)
+    });
+    if (r.ok) {
+      const j = await r.json();
+      auth = { idToken: j.id_token, refreshToken: j.refresh_token, exp: Date.now() + (Number(j.expires_in) - 300) * 1000 };
+      return auth.idToken;
+    }
+  }
+  const r = await fetch("https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=" + encodeURIComponent(cfg.apiKey), {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ returnSecureToken: true })
+  });
+  if (!r.ok) throw new Error("Login anonim gagal (" + r.status + "). Pastikan Anonymous Auth aktif.");
+  const j = await r.json();
+  auth = { idToken: j.idToken, refreshToken: j.refreshToken, exp: Date.now() + (Number(j.expiresIn) - 300) * 1000 };
+  return auth.idToken;
+}
+
+function dbUrl(path, params) {
+  const u = new URL(cfg.db.replace(/\/+$/, "") + ROOT + path + ".json");
+  if (params) for (const k in params) u.searchParams.set(k, params[k]);
+  if (auth.idToken) u.searchParams.set("auth", auth.idToken);
+  return u.toString();
+}
+
+// ---------- Streaming (Server-Sent Events) ----------
+function setAt(obj, path, data) {
+  const parts = path.split("/").filter(Boolean);
+  if (!parts.length) return data;
+  const root = (obj && typeof obj === "object") ? { ...obj } : {};
+  let cur = root;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const k = parts[i];
+    cur[k] = (cur[k] && typeof cur[k] === "object") ? { ...cur[k] } : {};
+    cur = cur[k];
+  }
+  const last = parts[parts.length - 1];
+  if (data === null) delete cur[last]; else cur[last] = data;
+  return root;
+}
+
+let connOk = { telemetry: false, controls: false, event_log: false };
+function openStream(name, path, params, onData) {
+  if (streams[name]) streams[name].close();
+  let state = null;
+  const es = new EventSource(dbUrl(path, params));
+  streams[name] = es;
+  es.addEventListener("put", (e) => {
+    const m = JSON.parse(e.data); state = setAt(state, m.path, m.data); onData(state);
+  });
+  es.addEventListener("patch", (e) => {
+    const m = JSON.parse(e.data);
+    for (const k in m.data) state = setAt(state, m.path.replace(/\/$/, "") + "/" + k, m.data[k]);
+    onData(state);
+  });
+  es.addEventListener("cancel", () => { connOk[name] = false; setConn("denied"); });
+  es.addEventListener("auth_revoked", async () => {
+    try { await ensureAuth(true); connect(); } catch (err) { setConn("error", err.message); }
+  });
+  es.onopen = () => { connOk[name] = true; setConn(); };
+  es.onerror = () => { connOk[name] = false; setConn(); };
+}
+
+async function connect() {
+  try { await ensureAuth(false); } catch (err) { setConn("error", err.message); return; }
+  openStream("telemetry", "/telemetry", null, (d) => { tel = d; onTelemetry(); });
+  openStream("controls", "/controls", null, (d) => { ctl = d || {}; renderControls(); });
+  openStream("event_log", "/event_log", { orderBy: '"$key"', limitToLast: 50 }, (d) => { log = d || {}; renderLog(); });
+}
+
+function setConn(kind, msg) {
+  const pill = $("connPill"), txt = $("connText");
+  const all = connOk.telemetry && connOk.controls && connOk.event_log;
+  if (kind === "denied") { pill.className = "pill bad"; txt.textContent = "Firebase: akses ditolak (cek Rules / API key)"; return; }
+  if (kind === "error") { pill.className = "pill bad"; txt.textContent = msg || "Firebase: error"; return; }
+  pill.className = all ? "pill ok" : "pill warn";
+  txt.textContent = all ? "Firebase: terhubung" : "Firebase: menyambung ulang…";
+}
+
+// ---------- Tulis perintah ----------
+async function writeCtl(obj, label) {
+  try {
+    await ensureAuth(false);
+    const r = await fetch(dbUrl("/controls"), { method: "PATCH", body: JSON.stringify(obj) });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    toast(label + " dikirim ke Firebase");
+  } catch (err) { toast("Gagal mengirim: " + err.message); }
+}
+
+// ---------- Render ----------
+function fmtTime(ms) {
+  if (!ms) return "–";
+  return new Date(ms).toLocaleTimeString("id-ID", { timeZone: "Asia/Jakarta", hour12: false });
+}
+function fmtDur(s) {
+  if (s == null) return "–";
+  const m = Math.floor(s / 60), r = s % 60;
+  return m ? m + " mnt " + r + " dtk" : r + " dtk";
+}
+function stateClass(s) {
+  return s === "FAULT" ? "bad" : s === "COMPLETE" ? "ok" : s === "IDLE" ? "" : "info";
+}
+
+function renderFlow(cur) {
+  const f = $("flow"); f.textContent = "";
+  STATES.forEach((s, i) => {
+    if (i > 0) { const a = document.createElement("span"); a.className = "arrow"; a.textContent = s === "FAULT" ? "·" : "→"; f.appendChild(a); }
+    const el = document.createElement("span");
+    el.className = "st" + (s === "FAULT" ? " fault" : "") + (s === cur ? " active" : "");
+    el.textContent = s; f.appendChild(el);
+  });
+}
+
+function onTelemetry() {
+  if (tel && tel.timestamp && tel.timestamp !== lastTs) {
+    lastTs = tel.timestamp;
+    hist.push({ t: tel.timestamp, level: Number(tel.level), temp: Number(tel.temperature), valid: tel.temp_valid !== false });
+    if (hist.length > HIST_MAX) hist.shift();
+  }
+  renderTelemetry(); renderControls(); renderCharts();
+}
+
+function renderTelemetry() {
+  const t = tel || {};
+  const s = t.state || "–";
+  renderFlow(t.state);
+  $("stateBig").textContent = s;
+  $("stateBig").style.color = s === "FAULT" ? "var(--bad)" : s === "COMPLETE" ? "var(--ok)" : "";
+  $("stateSub").textContent = STATE_DESC[s] || " ";
+  $("kvMode").textContent = t.mode || "–";
+  $("kvBatch").textContent = t.batch_count ?? "–";
+  $("kvFault").textContent = (t.fault_reason && t.fault_reason !== "-") ? t.fault_reason : "–";
+  $("kvEstop").textContent = t.estop ? "AKTIF" : "tidak aktif";
+  $("kvEstop").style.color = t.estop ? "var(--bad)" : "";
+  $("kvUptime").textContent = fmtDur(t.uptime_s);
+
+  const lvl = Number(t.level);
+  $("levelBig").textContent = isFinite(lvl) ? lvl.toFixed(1) + " %" : "–";
+  $("tankFill").style.height = (isFinite(lvl) ? Math.max(0, Math.min(100, lvl)) : 0) + "%";
+  const ft = Number(t.fill_target);
+  $("kvFill").textContent = isFinite(ft) ? ft + " %" : "–";
+  if (isFinite(ft)) { $("markTarget").style.bottom = ft + "%"; $("markTarget").textContent = ft; }
+
+  const tmp = Number(t.temperature), sp = Number(t.setpoint);
+  $("tempBig").textContent = isFinite(tmp) ? tmp.toFixed(1) + " °C" : "–";
+  $("tempBig").style.color = t.temp_valid === false ? "var(--bad)" : "";
+  $("kvSp").textContent = isFinite(sp) ? sp + " °C" : "–";
+  $("kvBand").textContent = isFinite(sp) ? "nyala ≤ " + (sp - 2) + ", mati ≥ " + (sp + 2) + " °C" : "–";
+  $("kvValid").textContent = t.temp_valid === false ? (t.sim_sensor_fault ? "TIDAK VALID (simulasi)" : "TIDAK VALID") : "valid";
+  $("kvValid").style.color = t.temp_valid === false ? "var(--bad)" : "";
+
+  const acts = $("acts"); acts.textContent = "";
+  const a = t.actuators || {};
+  ACTUATORS.forEach(([k, name, rep]) => {
+    const d = document.createElement("div"); d.className = "act" + (a[k] ? " on" : "");
+    d.innerHTML = '<span class="lamp"></span><div><div class="name"></div><div class="rep"></div></div>';
+    d.querySelector(".name").textContent = name + (a[k] ? " · ON" : " · OFF");
+    d.querySelector(".rep").textContent = "Representasi: " + rep;
+    acts.appendChild(d);
+  });
+
+  const mask = Number(t.interlock_mask) || 0;
+  const il = $("interlocks"); il.textContent = "";
+  const active = INTERLOCKS.filter((_, i) => mask & (1 << i));
+  if (!active.length) { il.textContent = "Tidak ada"; }
+  else { const ul = document.createElement("ul"); ul.className = "il";
+    active.forEach((x) => { const li = document.createElement("li"); li.textContent = x; ul.appendChild(li); }); il.appendChild(ul); }
+
+  const fb = $("faultBanner");
+  if (s === "FAULT") { fb.textContent = "FAULT: " + (t.fault_reason || "?") + " — semua aktuator dimatikan. Hilangkan penyebabnya lalu tekan RESET."; fb.classList.add("show"); }
+  else fb.classList.remove("show");
+}
+
+function tickAge() {
+  const pill = $("espPill"), txt = $("espText"), sb = $("staleBanner");
+  if (!tel || !tel.timestamp) { pill.className = "pill"; txt.textContent = "ESP32: menunggu data"; $("kvAge").textContent = "–"; return; }
+  const age = Date.now() - tel.timestamp;
+  $("kvAge").textContent = fmtTime(tel.timestamp) + " (" + Math.max(0, Math.round(age / 1000)) + " dtk lalu)";
+  if (age > STALE_MS) {
+    pill.className = "pill bad"; txt.textContent = "ESP32: tidak mengirim data";
+    sb.textContent = "Data terakhir dari ESP32 berumur " + Math.round(age / 1000) + " detik. Simulasi berhenti, Wi-Fi Wokwi bermasalah, atau fault injection SIM NET FAIL aktif. Nilai di bawah adalah data terakhir.";
+    sb.classList.add("show");
+  } else { pill.className = "pill ok"; txt.textContent = "ESP32: online"; sb.classList.remove("show"); }
+}
+
+let spDirty = false, fillDirty = false;
+function renderControls() {
+  const mode = ctl.mode || "AUTO";
+  $("btnAuto").classList.toggle("sel", mode === "AUTO");
+  $("btnManual").classList.toggle("sel", mode === "MANUAL");
+  const estop = !!ctl.emergency_stop;
+  $("btnEstop").textContent = estop ? "LEPASKAN EMERGENCY STOP" : "EMERGENCY STOP";
+  $("btnEstop").className = estop ? "estop" : "danger estop";
+  if (!spDirty && ctl.temp_setpoint != null) $("inSp").value = ctl.temp_setpoint;
+  if (!fillDirty && ctl.fill_target != null) $("inFill").value = ctl.fill_target;
+
+  const espManual = tel && tel.mode === "MANUAL";
+  const list = $("manualList"); list.textContent = "";
+  MANUALS.forEach(([k, name]) => {
+    const row = document.createElement("div"); row.className = "toggle";
+    const lab = document.createElement("span"); lab.textContent = name;
+    const sw = document.createElement("label"); sw.className = "switch";
+    const inp = document.createElement("input"); inp.type = "checkbox"; inp.checked = !!ctl[k]; inp.disabled = !espManual;
+    inp.addEventListener("change", () => writeCtl({ [k]: inp.checked }, name + (inp.checked ? " ON" : " OFF")));
+    sw.appendChild(inp); sw.appendChild(document.createElement("span"));
+    row.appendChild(lab); row.appendChild(sw); list.appendChild(row);
+  });
+  $("manualHint").textContent = espManual
+    ? "Perintah tetap disaring interlock di ESP32. Status nyata lihat panel Aktuator."
+    : "Aktif setelah ESP32 benar-benar berada di mode MANUAL (pilih MANUAL saat state IDLE/FAULT).";
+}
+
+function renderLog() {
+  const body = $("logBody"); body.textContent = "";
+  const items = Object.entries(log).sort((a, b) => (a[0] < b[0] ? 1 : -1));
+  if (!items.length) { const tr = document.createElement("tr"); const td = document.createElement("td");
+    td.colSpan = 3; td.className = "sub"; td.textContent = "Belum ada event."; tr.appendChild(td); body.appendChild(tr); return; }
+  items.forEach(([, e]) => {
+    const tr = document.createElement("tr");
+    const t = document.createElement("td"); t.className = "t"; t.textContent = fmtTime(e.timestamp);
+    const ev = document.createElement("td"); const tag = document.createElement("span");
+    const name = String(e.event || "?");
+    tag.className = "tag " + (/FAULT$|ESTOP/.test(name) && name !== "FAULT_INJECTION" ? "bad"
+      : /REJECT|FAIL|INJECTION/.test(name) ? "warn" : /CLOUD|RESTORED/.test(name) ? "info"
+      : /MODE|PARAM|RESET|INIT|OK/.test(name) ? "ok" : "");
+    tag.textContent = name; ev.appendChild(tag);
+    const d = document.createElement("td"); d.textContent = e.detail || "";
+    tr.appendChild(t); tr.appendChild(ev); tr.appendChild(d); body.appendChild(tr);
+  });
+}
+
+// Pembuat elemen SVG sederhana: tag(nama, {atribut}, teks)
+function tag(name, attrs, text) {
+  let s = "<" + name;
+  for (const k in attrs) s += " " + k + '="' + attrs[k] + '"';
+  return text == null ? s + "/>" : s + ">" + text + "</" + name + ">";
+}
+function chart(svgId, key, yMin, yMax, color, refs) {
+  const svg = $(svgId), W = 400, H = 150, L = 30, R = 8, T = 10, B = 20;
+  const yOf = (v) => T + (1 - (v - yMin) / (yMax - yMin)) * (H - T - B);
+  const pts = hist.filter((p) => isFinite(p[key]) && (key !== "temp" || p.valid));
+  let html = "";
+  [yMin, (yMin + yMax) / 2, yMax].forEach((v) => {
+    const y = yOf(v);
+    html += tag("line", { class: "grid", x1: L, x2: W - R, y1: y, y2: y });
+    html += tag("text", { class: "axis", x: L - 4, y: y + 3, "text-anchor": "end" }, v);
+  });
+  (refs || []).forEach(([v, lab]) => {
+    if (!isFinite(v)) return;
+    const y = yOf(v);
+    html += tag("line", { x1: L, x2: W - R, y1: y, y2: y, stroke: "var(--muted)", "stroke-dasharray": "4 3", fill: "none" });
+    html += tag("text", { class: "axis", x: W - R, y: y - 4, "text-anchor": "end" }, lab + " " + v);
+  });
+  if (pts.length >= 2) {
+    const t0 = pts[0].t, t1 = pts[pts.length - 1].t, span = Math.max(1, t1 - t0);
+    const xy = pts.map((p) => [L + ((p.t - t0) / span) * (W - L - R), yOf(Math.max(yMin, Math.min(yMax, p[key])))]);
+    const line = xy.map((q, i) => (i ? "L" : "M") + q[0].toFixed(1) + " " + q[1].toFixed(1)).join(" ");
+    const base = yOf(yMin).toFixed(1);
+    html += tag("path", { d: line + " L" + xy[xy.length - 1][0].toFixed(1) + " " + base + " L" + xy[0][0].toFixed(1) + " " + base + " Z",
+      fill: color, "fill-opacity": "0.12", stroke: "none" });
+    html += tag("path", { class: "ln", d: line, stroke: color, fill: "none" });
+    const end = xy[xy.length - 1];
+    html += tag("circle", { cx: end[0].toFixed(1), cy: end[1].toFixed(1), r: 3.5, fill: color });
+    html += tag("text", { class: "axis", x: L, y: H - 5 }, fmtTime(t0));
+    html += tag("text", { class: "axis", x: W - R, y: H - 5, "text-anchor": "end" }, fmtTime(t1));
+  } else {
+    html += tag("text", { class: "axis", x: W / 2, y: H / 2, "text-anchor": "middle" }, "Menunggu data…");
+  }
+  svg.innerHTML = html;
+}
+function renderCharts() {
+  const t = tel || {};
+  chart("chartLevel", "level", 0, 100, "var(--water)", [[Number(t.fill_target), "target"]]);
+  chart("chartTemp", "temp", 0, 80, "var(--bad)", [[Number(t.setpoint), "setpoint"]]);
+}
+
+let toastTimer = null;
+function toast(msg) {
+  const el = $("toast"); el.textContent = msg; el.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove("show"), 2500);
+}
+
+// ---------- Event tombol ----------
+$("btnAuto").onclick = () => writeCtl({ mode: "AUTO" }, "Mode AUTO");
+$("btnManual").onclick = () => writeCtl({ mode: "MANUAL" }, "Mode MANUAL");
+$("btnStart").onclick = () => writeCtl({ start: true }, "START");
+$("btnReset").onclick = () => writeCtl({ reset: true }, "RESET");
+$("btnEstop").onclick = () => writeCtl({ emergency_stop: !ctl.emergency_stop }, ctl.emergency_stop ? "Lepas E-Stop" : "EMERGENCY STOP");
+$("inSp").oninput = () => { spDirty = true; };
+$("inFill").oninput = () => { fillDirty = true; };
+$("btnParams").onclick = async () => {
+  const sp = Number($("inSp").value), ft = Number($("inFill").value), upd = {};
+  if ($("inSp").value !== "") upd.temp_setpoint = sp;
+  if ($("inFill").value !== "") upd.fill_target = ft;
+  if (!Object.keys(upd).length) return;
+  await writeCtl(upd, "Parameter");
+  spDirty = fillDirty = false;
+};
+$("inDb").value = cfg.db; $("inKey").value = cfg.apiKey;
+$("btnSave").onclick = () => {
+  cfg.db = $("inDb").value.trim() || DEFAULT_DB; cfg.apiKey = $("inKey").value.trim();
+  store.set("dash_db", cfg.db); store.set("dash_key", cfg.apiKey);
+  auth = { idToken: null, refreshToken: null, exp: 0 };
+  tel = null; hist.length = 0; lastTs = 0;
+  connect(); toast("Pengaturan disimpan");
+};
+
+renderFlow(null); renderTelemetry(); renderControls(); renderCharts();
+setInterval(tickAge, 1000);
+setInterval(async () => {   // perpanjang token sebelum kedaluwarsa
+  if (cfg.apiKey && auth.idToken && Date.now() > auth.exp) { try { await ensureAuth(true); connect(); } catch (e) {} }
+}, 60000);
+connect();
+})();
+</script>
+</body>
+</html>
